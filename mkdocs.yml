@@ -1,0 +1,15 @@
+site_name: રાસ-ગરબા સંગ્રહ
+site_author: Paresh Adhia
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.tracking
+    - navigation.indexes
+
+markdown_extensions:
+  - toc:
+      permalink: True
+
+extra_css:
+  - stylesheets/extra.css
