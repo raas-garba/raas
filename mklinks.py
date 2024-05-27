@@ -12,17 +12,23 @@ from typing import Any, Iterable, TypeAlias, cast
 
 from yaml import safe_load  # type: ignore
 
-YearInfo: TypeAlias = dict[str, "YearInfo"] | list[str]
+Schedule: TypeAlias = dict[str, "Schedule"] | list[str]
 
 
-def main(link_info: Path, docs_dir: Path) -> None:
+def main(docs_dir: Path) -> None:
     "script entry-point"
     lib = {p.stem: p for d in docs_dir.iterdir() for p in d.resolve().rglob("*.md") if p.is_file()}
 
-    with link_info.open() as f:
-        link_hier = cast(YearInfo, safe_load(f))
+    schedules = (d for d in docs_dir.rglob("schedule.yml"))
+    for s in schedules:
+        fill_schedule(s, lib)
 
-    def iterpath(o: YearInfo, parent: Path) -> Iterable[tuple[Path, Path | None]]:
+
+def fill_schedule(schedule_file: Path, lib: dict[str, Path]):
+    with schedule_file.open() as f:
+        schedule = cast(Schedule, safe_load(f))
+
+    def iterpath(o: Schedule, parent: Path) -> Iterable[tuple[Path, Path | None]]:
         if isinstance(o, list):
             for v in o:
                 yield (parent / f"{v}.md", lib.get(v))
@@ -30,7 +36,7 @@ def main(link_info: Path, docs_dir: Path) -> None:
             for k, v in o.items():
                 yield from iterpath(v, parent / str(k))
 
-    links = dict(iterpath(link_hier, link_info.parent))
+    links = dict(iterpath(schedule, schedule_file.parent))
     for d in {k.parent for k, v in links.items() if v is not None}:
         d.mkdir(parents=True, exist_ok=True)
 
@@ -38,6 +44,10 @@ def main(link_info: Path, docs_dir: Path) -> None:
         if base is None:
             print(f"No song file found for '{link}'", file=sys.stderr)
         else:
+            if link.is_symlink():
+                if link.samefile(base):
+                    continue
+                link.unlink()
             link.symlink_to(base)
 
 
@@ -55,7 +65,6 @@ def getargs():
         return {"default": p} if p.exists() else {"required": True}
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("link_info", type=existing_path, help="YAML file containing directory structure and songs selected")
     parser.add_argument(
         "--docs-dir", **mk_default(Path.cwd() / "docs"), type=existing_path, help="Docs root directory (default: ./docs)"
     )
